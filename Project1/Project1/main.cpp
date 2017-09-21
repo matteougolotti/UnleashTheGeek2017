@@ -80,9 +80,20 @@ struct Turn {
 
 		// My spread
 		if (_spread != -1) {
-			_planets[_spread]._maximizingUnits -= 5;
+			if (_maximizingPlayer) {
+				_planets[_spread]._maximizingUnits -= 5;
+			}
+			else {
+				_planets[_spread]._minimizingUnits -= 5;
+			}
+
 			for (int planetId : graph[_spread]) {
-				_planets[planetId]._maximizingUnits++;
+				if (_maximizingPlayer) {
+					_planets[planetId]._maximizingUnits++;
+				}
+				else {
+					_planets[planetId]._minimizingUnits++;
+				}
 			}
 		}
 
@@ -101,18 +112,7 @@ struct Turn {
 			}
 		}
 
-		if (_maximizingPlayer) {
-			return (minimizingPlanets == 0);
-		} else {
-			return (maximizingPlanets == 0);
-		}
-
-		/*if (_maximizingPlayer) {
-			return (maximizingPlanets > minimizingPlanets);
-		}
-		else {
-			return (maximizingPlanets < minimizingPlanets);
-		}*/
+		return (minimizingPlanets == 0) || (maximizingPlanets == 0);
 	}
 
 	int score(bool maximizingPlayer) {
