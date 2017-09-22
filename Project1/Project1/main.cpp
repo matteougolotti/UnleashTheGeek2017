@@ -227,6 +227,17 @@ vector<int> filterPlanets(const vector<Planet>& planets,
 	return std::move(vector<int>(filteredPlanets.begin(), filteredPlanets.end()));
 }
 
+/*void generatePerms(std::vector<int>& availablePlanets, std::vector<std::vector<int>>& permutations, std::vector<int> solution) {
+	if (solution.size() == 5) {
+		permutations.push_back(solution);
+	}
+
+	for (int planet : availablePlanets) {
+		solution.push_back(planet);
+		generatePerms(availablePlanets, permutations, solution);
+	}
+} */
+
 void generatePerms(std::vector<int>& prefix, const int length, std::vector<std::vector<int> >& result) {
 	const int n = 6;
 
@@ -280,6 +291,8 @@ std::vector<std::pair<std::vector<int>, int> > generateMoves(std::vector<Planet>
 	std::vector<int> prefix = std::vector<int>();
 
 	generatePerms(prefix, filteredPlanets.size(), permutations);
+	/*std::vector<int> initialSolution;
+	generatePerms(filteredPlanets, permutations, initialSolution);*/
 
 	for (auto permutation : permutations){
 		std::vector<int> move ;
