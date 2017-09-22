@@ -59,7 +59,7 @@ struct Planet {
 		_canAssign = canAssign;
 	}
 
-	bool isMine(bool maximizingPlayer) {
+	bool isMine(bool maximizingPlayer) const {
 		if (maximizingPlayer) {
 			return (_maximizingUnits > _minimizingUnits);
 		} else {
@@ -72,6 +72,7 @@ struct Planet {
 	int _minimizingUnits;
 	int _minimizingTolerance;
 	int _canAssign;
+	int _id;
 };
 
 ostream& operator<<(ostream& str, const Planet& p) {
@@ -189,6 +190,46 @@ struct Turn {
 			 cout << "NONE" << endl;
 		 	 }
 		  }
+};
+
+struct PlanetComp {
+	const vector<Planet>& pv;
+	const vector<vector<int>>& g;
+	bool maxPlayer;
+
+	PlanetComp(const vector<Planet>& planets, const vector<vector<int>>& graph, bool maximizingPlayer)
+	: pv(planets), g(graph), maxPlayer(maximizingPlayer) {}
+
+	bool operator() (const Planet* lp, const Planet* rp) const {
+		return count_adjacent_not_mine(*lp) > count_adjacent_not_mine(*rp);
+	}
+
+	int count_adjacent_not_mine(const Planet& p) const {
+		int num = 0;
+		const vector<int>& v = g[p._id]; // neighbor planet ids
+		for (auto pid : v) {
+			if (not pv[pid].isMine(maxPlayer)) {
+				++num;
+			}
+		}
+		return num;
+	}
+};
+
+vector<int> rankPlanets(const vector<int>& filtered_planets, const vector<Planet>& planets, const vector<vector<int>>& graph, bool maximizingPlayer) {
+	vector<const Planet*> pv;
+	pv.reserve(filtered_planets.size());
+	for (int fp : filtered_planets) {
+		pv.push_back(&planets[fp]);
+	}
+	sort(pv.begin(), pv.end(), PlanetComp(planets, graph, maximizingPlayer));
+
+	vector<int> ranks;
+	ranks.reserve(pv.size());
+	for (const Planet* p : pv) {
+		ranks.push_back(p->_id);
+	}
+	return ranks;
 };
 
 void printGraph(std::vector<std::vector<int> >& graph) {
@@ -346,8 +387,10 @@ void generateMoves(std::vector<Planet>& planets,
 
 	std::vector<int> filteredPlanets = filterPlanets(planets, graph, maximizingPlayer);
 
+	std::vector<int> rankedPlanets = rankPlanets(filteredPlanets, planets, graph, maximizingPlayer);
+
 	cerr << "Filtered planets :" << endl;
-	for (int planet : filteredPlanets) {
+	for (int planet : rankedPlanets) {
 		cerr << planet << endl;
 	}
 
@@ -365,7 +408,7 @@ void generateMoves(std::vector<Planet>& planets,
 
 	// New New solution
 
-    generate(filteredPlanets.size(), 5, 5, permutations);
+    generate(rankedPlanets.size(), 5, 5, permutations);
     cerr << "Generated " << permutations.size() << " permutations" << endl;
 	/* End new new solution */
 
@@ -376,7 +419,7 @@ void generateMoves(std::vector<Planet>& planets,
 		for(int i=0; i< permutation.size() ; i++){
 			int units = permutation[i];
 			while(units > 0){
-				move.push_back(filteredPlanets[i]);
+				move.push_back(rankedPlanets[i]);
 				units--;
 			}
 		}
@@ -386,7 +429,7 @@ void generateMoves(std::vector<Planet>& planets,
 	cerr << "Generated " << permutations.size() << " moves" << endl;
 
 	// Add spreads for eligible planets
-	for (int move_i = 0; move_i < moves.size(); ++move_i) {
+	/*for (int move_i = 0; move_i < moves.size(); ++move_i) {
 		std::pair<std::vector<int>, int> moveWithoutSpread = make_pair(moves[move_i], -1);
 		solutions.push_back(moveWithoutSpread);
 
@@ -401,34 +444,40 @@ void generateMoves(std::vector<Planet>& planets,
 				solutions.push_back(moveWithSpread);
 			}
 		}
-	}
+	}*/
 
 	// New new spread logic
 
-	/*for (int move_i = 0; move_i < moves.size(); ++move_i) {
+	// figure out the planet
+	int spreadPlanet = -1;
+	int maxUnits = -1;
 
+	if(maximizingPlayer){
 
-
-
-		int max = -1;
 			for (int i = 0; i < planets.size(); i++) {
-			auto p = planets[i];
-			if (p._myUnits > planets[i]._myUnits && p._myUnits - 5 > p._otherUnits) {
-			max = i;
-			}
-			}
-			if (planets[max]._myUnits > 5) spreadPlanet = max;
+				auto p = planets[i];
+				if ( p._maximizingUnits > maxUnits && p._maximizingUnits - 5 > p._minimizingUnits && graph[i].size() > 5) {
+					spreadPlanet = i;
+					maxUnits = planets[spreadPlanet]._maximizingUnits;
+				}
+				}
 
-			for (int i = 0; i < 5; ++i) {
-			       cout << moves[i] << endl;
-			       }
+	}
+	else{
+			for (int i = 0; i < planets.size(); i++) {
+				auto p = planets[i];
+				if (p._minimizingUnits > maxUnits && p._minimizingUnits - 5 > p._maximizingUnits  && graph[i].size() > 5) {
+					spreadPlanet = i;
+					maxUnits = planets[spreadPlanet]._maximizingUnits;
+				}
+				}
 
-			if (spreadPlanet == -1) {
-			  cout << "NONE" << endl;
-			} else {
-			cout << spreadPlanet << endl;
-			}
-	}*/
+	}
+
+
+	for (auto move : moves) {
+		solutions.push_back(make_pair(move, spreadPlanet));
+	}
 
 	// End new new spread logic
 
@@ -477,6 +526,9 @@ int minmax(vector<vector<int>>& graph,
 	}
 }
 
+
+
+
 int main()
 {
     vector<vector<int>> graph;
@@ -500,6 +552,7 @@ int main()
     planets.reserve(planetCount);
     for (int i = 0; i < planetCount; ++i) {
     	planets.push_back(Planet());
+    	planets.back()._id = i;
     }
 
     // game loop
