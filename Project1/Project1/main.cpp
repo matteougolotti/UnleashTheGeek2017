@@ -135,7 +135,7 @@ struct Turn {
 		}
 		else {
 			return minimizingPlanets - maximizingPlanets;
-		} 
+		}
 	}
 
 	void printMove() {
@@ -229,6 +229,11 @@ vector<int> filterPlanets(const vector<Planet>& planets,
 
 void generatePerms(std::vector<int>& prefix, const int length, std::vector<std::vector<int> >& result) {
 	const int n = 6;
+
+	if (length < 1) {
+		return;
+	}
+
 	if (length == 1) {
 		for (int j = 0; j < n; j++) {
 			std::vector<int> final(prefix);
@@ -292,10 +297,22 @@ std::vector<std::pair<std::vector<int>, int> > generateMoves(std::vector<Planet>
 
 	// Add spreads for eligible planets
 	for (int move_i = 0; move_i < moves.size(); ++move_i) {
-		std::pair<std::vector<int>, int> moveWithoutSpread = make_pair(moves[move_i],-1);
+		std::pair<std::vector<int>, int> moveWithoutSpread = make_pair(moves[move_i], -1);
 		movesGenerated.push_back(moveWithoutSpread);
 
-		for (int planet_i = 0; planet_i < planets.size(); ++planet_i) {
+		Turn turn(graph, moveWithoutSpread.first, moveWithoutSpread.second, planets, maximizingPlayer);
+
+		for (int planet_i : filteredPlanets) {
+			if (((maximizingPlayer) && (turn._planets[planet_i]._maximizingUnits >= 5))
+				|| ((!maximizingPlayer) && (turn._planets[planet_i]._minimizingUnits >= 5))) {
+
+				// create a new pair with spread
+				std::pair<std::vector<int>, int> moveWithSpread = std::make_pair(moves[move_i], planet_i);
+				movesGenerated.push_back(moveWithSpread);
+			}
+		}
+
+		/*for (int planet_i = 0; planet_i < planets.size(); ++planet_i) {
 			if (((maximizingPlayer) && (planets[planet_i]._maximizingUnits > 5))
 					|| ((!maximizingPlayer) && (planets[planet_i]._minimizingUnits > 5))) {
 
@@ -303,7 +320,7 @@ std::vector<std::pair<std::vector<int>, int> > generateMoves(std::vector<Planet>
 				std::pair<std::vector<int>, int> moveWithSpread = std::make_pair(moves[move_i],planet_i );
 				movesGenerated.push_back(moveWithSpread);
 			}
-		}
+		}*/
 	}
 
 	cerr << "Generated " << movesGenerated.size() << " moves" << endl;
@@ -314,31 +331,43 @@ std::vector<std::pair<std::vector<int>, int> > generateMoves(std::vector<Planet>
 int minmax(vector<vector<int>>& graph,
 	Turn& turn,
 	int depth,
-	bool maximizingPlayer) {
+	bool maximizingPlayer,
+	int alpha,
+	int beta) {
 	
 	if ((depth == 0) || turn.isWinningTurn()) {
 		return turn.score(maximizingPlayer);
     }
     
 	if (maximizingPlayer) {
-		int bestValue = std::numeric_limits<int>::min();
+		int v = std::numeric_limits<int>::min();
 		auto moves = generateMoves(turn._planets, graph, maximizingPlayer);
+		int tested_moves = 0;
 		for (auto move : moves) {
+			tested_moves++;
 			Turn nextTurn(graph, move.first, move.second, turn._planets, maximizingPlayer);
-			auto v = minmax(graph, nextTurn, depth, false);
-			bestValue = max(bestValue, v);
-			return bestValue;
+			v = max(v, minmax(graph, nextTurn, depth, false, alpha, beta));
+			alpha = max(alpha, v);
+			if (beta <= alpha) {
+				break;
+			}
 		}
+	    return v;
 	}
 	else {
-		int bestValue = std::numeric_limits<int>::max();
+		int v = std::numeric_limits<int>::max();
 		auto moves = generateMoves(turn._planets, graph, maximizingPlayer);
+		int tested_moves = 0;
 		for (auto move : moves) {
+			tested_moves++;
 			Turn nextTurn(graph, move.first, move.second, turn._planets, maximizingPlayer);
-			auto v = minmax(graph, nextTurn, depth - 1, true);
-			bestValue = min(bestValue, v);
-			return bestValue;
+			v = min(v, minmax(graph, nextTurn, depth - 1, true, alpha, beta));
+			beta = min(beta, v);
+			if (beta <= alpha) {
+				break;
+			}
 		}
+		return v;
 	}
 }
 
@@ -386,7 +415,7 @@ int main()
 		int nextMove = 0;
 		for (int i = 0; i < moves.size(); ++i) {
 			Turn turn(graph, moves[i].first, moves[i].second, planets, true);
-			int val = minmax(graph, turn, planets.size(), false);
+			int val = minmax(graph, turn, 1, false, std::numeric_limits<int>::min(), std::numeric_limits<int>::max());
 			if (val > best) {
 				nextMove = i;
 				best = val;
