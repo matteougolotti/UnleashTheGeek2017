@@ -1,4 +1,4 @@
-#include <iostream>
+﻿#include <iostream>
 #include <string>
 #include <vector>
 #include <algorithm>
@@ -9,107 +9,141 @@
 
 using namespace std;
 
-bool isMyTurn = true;
-
 struct Planet {
 
-	void set(int myUnits, int myTolerance, int otherUnits, int otherTolerance, int canAssign) {
-		_myUnits = myUnits;
-		_myTolerance = myTolerance;
-		_otherUnits = otherUnits;
-		_otherTolerance = otherTolerance;
+	void set(int maximizingUnits, int maximizingTolerance, int minimizingUnits, int minimizingTolerance, int canAssign) {
+		_maximizingUnits = maximizingUnits;
+		_maximizingTolerance = maximizingTolerance;
+		_minimizingUnits = minimizingUnits;
+		_minimizingTolerance = minimizingTolerance;
 		_canAssign = canAssign;
 	}
 
-	bool isMine() {
-		if (isMyTurn) {
-			return (_myUnits > _otherUnits);
+	bool isMine(bool maximizingPlayer) {
+		if (maximizingPlayer) {
+			return (_maximizingUnits > _minimizingUnits);
 		} else {
-			return (_otherUnits > _myUnits);
+			return (_minimizingUnits > _maximizingUnits);
 		}
 	}
 
-	int _myUnits;
-	int _myTolerance;
-	int _otherUnits;
-	int _otherTolerance;
+	int _maximizingUnits;
+	int _maximizingTolerance;
+	int _minimizingUnits;
+	int _minimizingTolerance;
 	int _canAssign;
 };
 
 ostream& operator<<(ostream& str, const Planet& p) {
-	str << "myUnits: " << p._myUnits << ", myTol: " << p._myTolerance
-		<< ", otherUnits: " << p._otherUnits << ", otherTol: " << p._otherTolerance << ", canAssign: " << p._canAssign;
+	str << "myUnits: " << p._maximizingUnits << ", myTol: " << p._maximizingTolerance
+		<< ", otherUnits: " << p._minimizingUnits << ", otherTol: " << p._minimizingTolerance << ", canAssign: " << p._canAssign;
 	return str;
 }
 
 struct Turn {
-
-	int _wins;
-	int _losses;
-	std::shared_ptr<Turn> _parent;
-	bool _myTurn;
-	bool _localWin;
-	bool _localLoss;
-	int _isSpread;
-	std::vector<int> _myMoves;
+	bool _maximizingPlayer;
+	int _spread;
+	std::vector<int> _moves;
 	std::vector<Planet> _planets;
-	std::vector<std::shared_ptr<Turn> > _children;
 
-	Turn() : _wins(0), _losses(0), _parent(NULL), _localWin(false), _localLoss(false), _myTurn(false), _isSpread(-1) {}
+	Turn(const std::vector<std::vector<int>>& graph,
+		const std::vector<int>& moves,
+		int spread,
+		std::vector<Planet>& planets,
+		bool maximizingPlayer)
+	: _moves(moves),
+	_spread(spread),
+	_planets(planets),
+	_maximizingPlayer(maximizingPlayer) {
 
-	void setWin() {
-		++_wins;
-		if (_parent != NULL) {
-			_parent->setWin();
-		}
-	}
-
-	void setLoss() {
-		++_losses;
-		if (_parent != NULL) {
-			_parent->setLoss();
-		}
-	}
-
-	void set(const std::vector<std::vector<int>>& graph,
-			const std::vector<int>& myMoves,
-			int mySpread,
-			std::shared_ptr<Turn>& parent,
-			std::vector<Planet>& planets,
-			bool myTurn) {
-
-		_parent = parent;
-		_planets = planets;
-		_isSpread= mySpread;
-		_myMoves.assign(myMoves.begin(), myMoves.end());
-
-		// TODO Add my units
-		for (int i = 0; i < myMoves.size(); ++i) {
-            _planets[myMoves[i]]._myUnits++;
+		// Add units
+		for (int i = 0; i < moves.size(); ++i) {
+			if (_maximizingPlayer) {
+				_planets[moves[i]]._maximizingUnits++;
+			}
+			else {
+				_planets[moves[i]]._minimizingUnits++;
+			}
 		}
 
-		// TODO Update my tolerance
+		// Update tolerance
 		for (int i = 0; i < _planets.size(); ++i) {
-			if (std::find(myMoves.begin(), myMoves.end(), i) != myMoves.end()) {
-				_planets[i]._myTolerance--;
+			if (std::find(moves.begin(), moves.end(), i) != moves.end()) {
+				if (_maximizingPlayer) {
+					_planets[i]._maximizingTolerance--;
+				}
+				else {
+					_planets[i]._minimizingTolerance--;
+				}
 			}
 		}
 
-		// TODO My spread
-		if (mySpread != -1) {
-			_planets[mySpread]._myUnits -= 5;
-			for (int planetId : graph[mySpread]) {
-				_planets[planetId]._myUnits++;
+		// My spread
+		if (_spread != -1) {
+			if (_maximizingPlayer) {
+				_planets[_spread]._maximizingUnits -= 5;
+			}
+			else {
+				_planets[_spread]._minimizingUnits -= 5;
+			}
+
+			for (int planetId : graph[_spread]) {
+				if (_maximizingPlayer) {
+					_planets[planetId]._maximizingUnits++;
+				}
+				else {
+					_planets[planetId]._minimizingUnits++;
+				}
 			}
 		}
+
+	}
+
+	bool isWinningTurn() {
+		int maximizingPlanets = 0;
+		int minimizingPlanets = 0;
+
+		for (Planet& planet : _planets) {
+			if (planet.isMine(true)) {
+				maximizingPlanets++;
+			}
+			else if (planet.isMine(false)) {
+				minimizingPlanets++;
+			}
+		}
+
+		return (minimizingPlanets == 0) || (maximizingPlanets == 0);
+	}
+
+	int score(bool maximizingPlayer) {
+		int maximizingPlanets = 0;
+		int minimizingPlanets = 0;
+
+		for (Planet& planet : _planets) {
+			if (planet.isMine(true)) {
+				maximizingPlanets++;
+			}
+			else if (planet.isMine(false)) {
+				minimizingPlanets++;
+			}
+		}
+
+		return maximizingPlanets - minimizingPlanets;
+
+		/*if (maximizingPlayer) {
+			return maximizingPlanets - minimizingPlanets;
+		}
+		else {
+			return minimizingPlanets - maximizingPlanets;
+		}*/
 	}
 
 	void printMove() {
-		 for (int i = 0; i < _myMoves.size(); ++i) {
-				 cout << _myMoves[i] << endl;
+		 for (int i = 0; i < _moves.size(); ++i) {
+				 cout << _moves[i] << endl;
 			 }
-		 if( _isSpread != -1){
-			 cout << _isSpread << endl;
+		 if( _spread != -1){
+			 cout << _spread << endl;
 
 		 }else{
 			 cout << "NONE" << endl;
@@ -140,108 +174,96 @@ void printMove(pair<vector<int>, int>& move) {
 	cerr << endl;
 }
 
-std::shared_ptr<Turn> solutionsTree = std::make_shared<Turn>();
-
-
-bool isNearControlled(int planetId, const vector<Planet>& pv, const vector<vector<int>>& graph) {
+bool isNearControlled(int planetId, const vector<Planet>& pv, 
+	const vector<vector<int>>& graph,
+	bool maximizingPlayer) {
 
 	auto neighbors = graph[planetId];
 	int controlled = 0;
-	if (isMyTurn) {
+	if (maximizingPlayer) {
 		for (auto n : neighbors) {
-			if (pv[n]._myUnits > pv[n]._otherUnits) {
+			if (pv[n]._maximizingUnits > pv[n]._minimizingUnits) {
 				++controlled;
 			}
 		}
-	}else{
+	} else {
 		for (auto n : neighbors) {
-			if (pv[n]._otherUnits > pv[n]._myUnits) {
+			if (pv[n]._minimizingUnits > pv[n]._maximizingUnits) {
 				++controlled;
 			}
 		}
 	}
-	return (controlled != neighbors.size()) and (controlled > 0);
+	return (controlled != neighbors.size()) && (controlled > 0);
 }
 
-vector<int> filterPlanets(const vector<Planet>& planets, const vector<vector<int>>& graph) {
+vector<int> filterPlanets(const vector<Planet>& planets, 
+	const vector<vector<int>>& graph,
+	bool maximizingPlayer) {
 	//printPlanets(planets);
 
 	set<int> filteredPlanets;
-	if (isMyTurn) {
-
+	if (maximizingPlayer) {
 		for (int i = 0; i < planets.size(); ++i) {
 			auto p = planets[i];
 
 			// Check that this planet is tolerant and is adjacent to one of my controlled planets.
-			bool isAdj = isNearControlled(i, planets, graph);
-			if ((p._myTolerance > 0) and isAdj) {
+			bool isAdj = isNearControlled(i, planets, graph, maximizingPlayer);
+			if ((p._maximizingTolerance > 0) && isAdj) {
 				filteredPlanets.insert(i);
 			}
 		}
 	} else {
-
 		for (int i = 0; i < planets.size(); ++i) {
 			auto p = planets[i];
 
 			// Check that this planet is tolerant and is adjacent to one of my controlled planets.
-			bool isAdj = isNearControlled(i, planets, graph);
-			if ((p._otherTolerance > 0) and isAdj) {
+			bool isAdj = isNearControlled(i, planets, graph, maximizingPlayer);
+			if ((p._minimizingTolerance > 0) && isAdj) {
 				filteredPlanets.insert(i);
 			}
 		}
-
 	}
 
 	return std::move(vector<int>(filteredPlanets.begin(), filteredPlanets.end()));
 }
 
-//std::vector<int> filterPlanets(std::vector<Planet>& planets, std::vector<std::vector<int> >& graph) {
-//
-//	printGraph(graph);
-//	printPlanets(planets);
-//
-//	set<int> filteredPlanets ;
-//	if (isMyTurn) {
-//		for (int i = 0; i < planets.size(); ++i) {
-//			if( planets[i]._myTolerance > 0 ){
-//				if((planets[i]._myUnits >= planets[i]._otherUnits) and (planets[i]._myUnits > 0)){
-//					bool isNeighborEnemy = false;
-//					for (int neighbor_i : graph[i]) {
-//					  if (planets[neighbor_i]._otherUnits >= planets[neighbor_i]._myUnits) {
-//						  isNeighborEnemy = true;
-//						  filteredPlanets.insert(neighbor_i);
-//					  }
-//					}
-//					if (isNeighborEnemy) {
-//						filteredPlanets.insert(i);
-//					}
-//				}
-//			}
-//		}
-//	} else {
-//		for (int i = 0; i < planets.size(); ++i) {
-//			if( planets[i]._otherTolerance > 0 ){
-//				if((planets[i]._otherUnits >= planets[i]._myUnits)){
-//					bool isNeighborEnemy = false;
-//					for (int neighbor_i : graph[i]) {
-//						if (planets[neighbor_i]._myUnits >= planets[neighbor_i]._otherUnits) {
-//							isNeighborEnemy = true;
-//							filteredPlanets.insert(neighbor_i);
-//						}
-//					}
-//					if (isNeighborEnemy) {
-//						filteredPlanets.insert(i);
-//					}
-//				}
-//			}
-//		}
-//	}
-//
-//	return vector<int>(filteredPlanets.begin(), filteredPlanets.end());
-//}
+void generatePermsRec(std::vector<int>& baseSolution, std::vector<std::vector<int>>& solutions, int unitsLeft) {
+  if (unitsLeft == 0) {
+	  solutions.push_back(baseSolution);
+	  return;
+  }
+
+  for (int i = 0; i < baseSolution.size(); ++i) {
+	  baseSolution[i]++;
+	  generatePermsRec(baseSolution, solutions, unitsLeft - 1);
+	  baseSolution[i]--;
+  }
+}
+
+void generatePermsInit(std::vector<int>& filteredPlanets, std::vector<std::vector<int>>& solutions) {
+  std::vector<int> baseSolution(filteredPlanets.size(), 0);
+
+  std::vector<std::vector<int>> filteredPlanetsIndexesSolutions;
+  generatePermsRec(baseSolution, filteredPlanetsIndexesSolutions, 5);
+
+  for (int solution_i = 0; solution_i < filteredPlanetsIndexesSolutions.size(); ++solution_i) {
+	  std::vector<int> globalPlanetsSolution;
+	  for (int planet_i = 0; planet_i < filteredPlanetsIndexesSolutions[solution_i].size(); ++planet_i) {
+          for (int n = 0; n < filteredPlanetsIndexesSolutions[solution_i][planet_i]; ++n) {
+        	  globalPlanetsSolution.push_back(filteredPlanets[planet_i]);
+          }
+	  }
+    solutions.push_back(globalPlanetsSolution);
+  }
+}
 
 void generatePerms(std::vector<int>& prefix, const int length, std::vector<std::vector<int> >& result) {
 	const int n = 6;
+
+	if (length < 1) {
+		return;
+	}
+
 	if (length == 1) {
 		for (int j = 0; j < n; j++) {
 			std::vector<int> final(prefix);
@@ -267,15 +289,17 @@ void generatePerms(std::vector<int>& prefix, const int length, std::vector<std::
 	}
 }
 
-std::vector<std::pair<std::vector<int>, int> > generateMoves(std::vector<Planet>& planets, std::vector<std::vector<int> >& graph) {
+void generateMoves(std::vector<Planet>& planets,
+	std::vector<std::vector<int> >& graph,
+	bool maximizingPlayer,
+	std::vector<std::pair<std::vector<int>, int> >& solutions) {
+
 	cerr << "generating moves ..." << endl;
 
 	static int units = 5;
-	std::vector<std::vector<int> > moves;
+    // std::vector<std::vector<int> > moves;
 
-	std::vector<std::pair<std::vector<int>, int> > movesGenerated;
-
-	std::vector<int> filteredPlanets = filterPlanets(planets, graph);
+	std::vector<int> filteredPlanets = filterPlanets(planets, graph, maximizingPlayer);
 
 	cerr << "Filtered planets :" << endl;
 	for (int planet : filteredPlanets) {
@@ -285,8 +309,17 @@ std::vector<std::pair<std::vector<int>, int> > generateMoves(std::vector<Planet>
 	std::vector<std::vector<int> > permutations;
 	std::vector<int> prefix = std::vector<int>();
 
-	generatePerms(prefix, filteredPlanets.size(), permutations);
+	// TODO Add to have permutations back
+	//generatePerms(prefix, filteredPlanets.size(), permutations);
 
+	/* New solution */
+	generatePermsInit(filteredPlanets, permutations);
+	std::vector<std::vector<int> >& moves = permutations;
+
+	/* End new solution */
+
+	// TODO Add to have permutations back
+	/*std::vector<std::vector<int> > moves;
 	for (auto permutation : permutations){
 		std::vector<int> move ;
 		for(int i=0; i< permutation.size() ; i++){
@@ -297,134 +330,72 @@ std::vector<std::pair<std::vector<int>, int> > generateMoves(std::vector<Planet>
 			}
 		}
 		moves.push_back(move);
-	}
+	}*/
 
 	cerr << "Generated " << permutations.size() << " moves" << endl;
 
 	// Add spreads for eligible planets
 	for (int move_i = 0; move_i < moves.size(); ++move_i) {
-		std::pair<std::vector<int>, int> moveWithoutSpread = make_pair(moves[move_i],-1);
-		movesGenerated.push_back(moveWithoutSpread);
+		std::pair<std::vector<int>, int> moveWithoutSpread = make_pair(moves[move_i], -1);
+		solutions.push_back(moveWithoutSpread);
 
-		for (int planet_i = 0; planet_i < planets.size(); ++planet_i) {
-			if (((isMyTurn) && (planets[planet_i]._myUnits > 5))
-					|| ((!isMyTurn) && (planets[planet_i]._otherUnits > 5))) {
+		Turn turn(graph, moveWithoutSpread.first, moveWithoutSpread.second, planets, maximizingPlayer);
+
+		for (int planet_i : filteredPlanets) {
+			if (((maximizingPlayer) && (turn._planets[planet_i]._maximizingUnits >= 5))
+				|| ((!maximizingPlayer) && (turn._planets[planet_i]._minimizingUnits >= 5))) {
 
 				// create a new pair with spread
-				std::pair<std::vector<int>, int> moveWithSpread = std::make_pair(moves[move_i],planet_i );
-				movesGenerated.push_back(moveWithSpread);
+				std::pair<std::vector<int>, int> moveWithSpread = std::make_pair(moves[move_i], planet_i);
+				solutions.push_back(moveWithSpread);
 			}
 		}
 	}
 
-	cerr << "Generated " << movesGenerated.size() << " moves" << endl;
-
-	return movesGenerated;
+	cerr << "Generated " << solutions.size() << " moves" << endl;
 }
 
-void buildSolutions(std::shared_ptr<Turn>& prevTurn, std::vector<Planet>& planets, std::vector<std::vector<int> >& graph, int turnsLeft) {
-
-	// Decrement each planet that has a majority enemy neighbors
-	if (!isMyTurn) {
-		turnsLeft--;
-
-		vector<int> myDecrementingPlanets;
-		vector<int> otherDecrementingPlanets;
-		for (int planetId = 0; planetId < planets.size(); ++planetId) {
-			const vector<int>& neighbors = graph[planetId];
-			int myControlled = 0;
-			int otherControlled = 0;
-			for (int neighborId = 0; neighborId < neighbors.size(); ++neighborId) {
-				const Planet& neighbor = planets[neighborId];
-				if (neighbor._myUnits > neighbor._otherUnits) {
-					++myControlled;
-				} else if (neighbor._myUnits < neighbor._otherUnits) {
-					++otherControlled;
-				}
-			}
-			if (myControlled < otherControlled) {
-				myDecrementingPlanets.push_back(planetId);
-			} else if (myControlled > otherControlled) {
-				otherDecrementingPlanets.push_back(planetId);
-			}
-		}
-		for (int dp : myDecrementingPlanets) {
-			Planet& p = planets[dp];
-			if (p._myUnits > 0) { --p._myUnits; }
-		}
-		for (int dp : otherDecrementingPlanets) {
-			Planet& p = planets[dp];
-			if (p._otherUnits > 0) { --p._otherUnits; }
-		}
-
-		// Check if this is a final winning/losing turn.
-		int myPlanets = 0;
-		int otherPlanets = 0;
-		for (Planet& p : planets) {
-			if (p._myUnits > p._otherUnits) ++myPlanets;
-			else if (p._myUnits < p._otherUnits) ++otherPlanets;
-		}
-
-		if (otherPlanets == 0) { prevTurn->setWin(); cerr << "Winning solution found at depth " << turnsLeft << endl; return; }
-		if (myPlanets == 0) { prevTurn->setLoss(); cerr << "Losing solution found at depth " << turnsLeft << endl; return; }
-
-		if (turnsLeft == 0) {
-			if (otherPlanets > myPlanets) { prevTurn->setWin(); cerr << "Winning solution found at depth " << turnsLeft << endl; }
-			if (myPlanets > otherPlanets) { prevTurn->setLoss(); cerr << "Losing solution found at depth " << turnsLeft << endl; }
-			return;
-		}
-	}
-
-	isMyTurn = !isMyTurn;
-	std::vector<std::pair<std::vector<int>, int> > moves = generateMoves(planets, graph);
-	for (auto move : moves) {
-		std::shared_ptr<Turn> turn = std::make_shared<Turn>();
-		turn->set(graph, move.first, move.second, prevTurn, planets, isMyTurn);
-		prevTurn->_children.push_back(turn);
-
-		buildSolutions(turn, planets, graph, turnsLeft);
-	}
-}
-
-void buildSolutionsRoot(std::vector<Planet>& planets, std::vector<std::vector<int> >& graph) {
-	cerr << "Calculating solutions from root" << endl;
-
-	std::shared_ptr<Turn> firstTurn = solutionsTree;
-	std::vector<std::pair<std::vector<int>, int> > moves = generateMoves(planets, graph);
-    for (auto move : moves) {
-
-    	printMove(move);
-
-    	std::shared_ptr<Turn> turn = std::make_shared<Turn>();
-
-    	cerr << "before set" << endl;
-
-    	turn->set(graph, move.first, move.second, firstTurn, planets, true);
-
-    	cerr << "Before pushback" << endl;
-
-    	firstTurn->_children.push_back(turn);
-    	isMyTurn = false;
-
-    	cerr << "Before build solution" << endl;
-
-    	// Graph depth planets.size() - 1 for full solution
-    	buildSolutions(turn, planets, graph, 2);
-
+int minmax(vector<vector<int>>& graph,
+	Turn& turn,
+	int depth,
+	bool maximizingPlayer,
+	int alpha,
+	int beta) {
+	
+	if ((depth == 0) || turn.isWinningTurn()) {
+		return turn.score(maximizingPlayer);
     }
+    
+	if (maximizingPlayer) {
+		int v = std::numeric_limits<int>::min();
+		std::vector<std::pair<std::vector<int>, int> > moves;
+		generateMoves(turn._planets, graph, maximizingPlayer, moves);
+		for (auto move : moves) {
+			Turn nextTurn(graph, move.first, move.second, turn._planets, maximizingPlayer);
+			v = max(v, minmax(graph, nextTurn, depth, false, alpha, beta));
+			alpha = max(alpha, v);
+			if (beta <= alpha) {
+				break;
+			}
+		}
+	    return v;
+	}
+	else {
+		int v = std::numeric_limits<int>::max();
+		std::vector<std::pair<std::vector<int>, int> > moves;
+		generateMoves(turn._planets, graph, maximizingPlayer, moves);
+		for (auto move : moves) {
+			Turn nextTurn(graph, move.first, move.second, turn._planets, maximizingPlayer);
+			v = min(v, minmax(graph, nextTurn, depth - 1, true, alpha, beta));
+			beta = min(beta, v);
+			if (beta <= alpha) {
+				break;
+			}
+		}
+		return v;
+	}
 }
 
-void calculateTargets(const vector<Planet>& planets,
-		              const vector<vector<int>>& graph,
-					  vector<int>& targets,
-					  int& spreadPlanet) {
-
-}
-
-/**
- * Auto-generated code below aims at helping you parse
- * the standard input according to the problem statement.
- **/
 int main()
 {
     vector<vector<int>> graph;
@@ -443,24 +414,12 @@ int main()
         graph[planetB].push_back(planetA);
     }
 
-    // Do we need to do ensure uniqueness?
-
     // All the Planets
     std::vector<Planet> planets;
     planets.reserve(planetCount);
     for (int i = 0; i < planetCount; ++i) {
     	planets.push_back(Planet());
     }
-
-    // The IDs of target planets during a turn
-    std::vector<int> targets(5, 0); // Initialized to target only planet 0
-
-    // Unit spread planet (-1 if none)
-    int spreadPlanet = -1;
-
-    bool init = false;
-
-	shared_ptr<Turn> currentTurn = solutionsTree;
 
     // game loop
     while (1) {
@@ -475,36 +434,20 @@ int main()
 
             planets[i].set(myUnits, myTolerance, otherUnits, otherTolerance, canAssign);
         }
+        
+        std::vector<std::pair<std::vector<int>, int> > moves;
+		generateMoves(planets, graph, true, moves);
+		int best = std::numeric_limits<int>::min();
+		int nextMove = 0;
+		for (int i = 0; i < moves.size(); ++i) {
+			Turn turn(graph, moves[i].first, moves[i].second, planets, true);
+			int val = minmax(graph, turn, 1, false, std::numeric_limits<int>::min(), std::numeric_limits<int>::max());
+			if (val > best) {
+				nextMove = i;
+				best = val;
+			}
+		}
 
-        if (not init) {
-        	buildSolutionsRoot(planets, graph);
-        	init = true;
-        }
-
-        //calculateTargets(planets, graph, targets, spreadPlanet);
-        int maxGain = 0;
-        shared_ptr<Turn> bestSolution = currentTurn->_children[0];
-        for (shared_ptr<Turn>& solution : currentTurn->_children) {
-        	if (solution->_wins - solution->_losses > maxGain) {
-              bestSolution = solution;
-        	}
-        }
-
-        bestSolution->printMove();
-
-        currentTurn = bestSolution;
-
-        // Write an action using cout. DON'T FORGET THE "<< endl"
-        // To debug: cerr << "Debug messages..." << endl;
-
-//        for (int i = 0; i < 5; ++i) {
-//        	cout << targets[i] << endl;
-//        }
-//
-//        if (spreadPlanet == -1) {
-//            cout << "NONE" << endl;
-//        } else {
-//        	cout << spreadPlanet << endl;
-//        }
+		printMove(moves[nextMove]);
     }
 }
