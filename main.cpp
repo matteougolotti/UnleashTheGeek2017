@@ -9,6 +9,46 @@
 
 using namespace std;
 
+
+// Moves generation
+
+void generaterec(int arraySize, int sum, int upper, vector<int>& move){
+	if(arraySize <= 0 ){
+		return;
+	}
+	if(sum == 0){
+		int zeroes = arraySize ;
+		while(zeroes > 0){
+			move.push_back(0) ;
+			arraySize --;
+			zeroes --;
+		}
+		return;
+	}
+	else {
+		for(int i = upper; i > 0 ; i--){
+			if(sum-i >= 0 && arraySize > 0){
+				move.push_back(i) ;
+				generaterec(arraySize - 1, sum-i, i, move ) ;
+				break;
+			}
+		}
+	}
+}
+
+void generate(int arraySize, int sum, int upper, vector<vector<int>>& moves) {
+	for(int i = upper; i>0 ;i--){
+		if(sum-i >= 0){
+			vector<int> newMove;
+			newMove.push_back(i) ;
+			generaterec(arraySize - 1,sum-i, i, newMove );
+			if( arraySize > 5 || std::accumulate(newMove.begin(), newMove.end(), 0) == 5){
+				moves.push_back(newMove);
+			}
+		}
+	}
+}
+
 struct Planet {
 
 	void set(int maximizingUnits, int maximizingTolerance, int minimizingUnits, int minimizingTolerance, int canAssign) {
@@ -196,7 +236,7 @@ bool isNearControlled(int planetId, const vector<Planet>& pv,
 	return (controlled != neighbors.size()) && (controlled > 0);
 }
 
-vector<int> filterPlanets(const vector<Planet>& planets, 
+vector<int>&& filterPlanets(const vector<Planet>& planets,
 	const vector<vector<int>>& graph,
 	bool maximizingPlayer) {
 	//printPlanets(planets);
@@ -313,13 +353,19 @@ void generateMoves(std::vector<Planet>& planets,
 	//generatePerms(prefix, filteredPlanets.size(), permutations);
 
 	/* New solution */
-	generatePermsInit(filteredPlanets, permutations);
-	std::vector<std::vector<int> >& moves = permutations;
+	/*generatePermsInit(filteredPlanets, permutations);
+	std::vector<std::vector<int> >& moves = permutations;*/
 
-	/* End new solution */
+	// End new solution
+
+	// New New solution
+
+    generate(filteredPlanets.size(), 5, 5, permutations);
+
+	/* End new new solution */
 
 	// TODO Add to have permutations back
-	/*std::vector<std::vector<int> > moves;
+	std::vector<std::vector<int> > moves;
 	for (auto permutation : permutations){
 		std::vector<int> move ;
 		for(int i=0; i< permutation.size() ; i++){
@@ -330,7 +376,7 @@ void generateMoves(std::vector<Planet>& planets,
 			}
 		}
 		moves.push_back(move);
-	}*/
+	}
 
 	cerr << "Generated " << permutations.size() << " moves" << endl;
 
