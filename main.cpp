@@ -209,9 +209,14 @@ void printPlanets(const std::vector<Planet>& planets) {
 
 void printMove(pair<vector<int>, int>& move) {
 	for(auto m : move.first) {
-		cerr << m << " ";
+		cout << m << endl;
 	}
-	cerr << endl;
+
+	if (move.second != -1) {
+		cout << move.second << endl;
+	} else {
+		cout << "NONE" << endl;
+	}
 }
 
 bool isNearControlled(int planetId, const vector<Planet>& pv, 
@@ -236,7 +241,7 @@ bool isNearControlled(int planetId, const vector<Planet>& pv,
 	return (controlled != neighbors.size()) && (controlled > 0);
 }
 
-vector<int>&& filterPlanets(const vector<Planet>& planets,
+vector<int> filterPlanets(const vector<Planet>& planets,
 	const vector<vector<int>>& graph,
 	bool maximizingPlayer) {
 	//printPlanets(planets);
@@ -361,7 +366,7 @@ void generateMoves(std::vector<Planet>& planets,
 	// New New solution
 
     generate(filteredPlanets.size(), 5, 5, permutations);
-
+    cerr << "Generated " << permutations.size() << " permutations" << endl;
 	/* End new new solution */
 
 	// TODO Add to have permutations back
@@ -398,6 +403,35 @@ void generateMoves(std::vector<Planet>& planets,
 		}
 	}
 
+	// New new spread logic
+
+	/*for (int move_i = 0; move_i < moves.size(); ++move_i) {
+
+
+
+
+		int max = -1;
+			for (int i = 0; i < planets.size(); i++) {
+			auto p = planets[i];
+			if (p._myUnits > planets[i]._myUnits && p._myUnits - 5 > p._otherUnits) {
+			max = i;
+			}
+			}
+			if (planets[max]._myUnits > 5) spreadPlanet = max;
+
+			for (int i = 0; i < 5; ++i) {
+			       cout << moves[i] << endl;
+			       }
+
+			if (spreadPlanet == -1) {
+			  cout << "NONE" << endl;
+			} else {
+			cout << spreadPlanet << endl;
+			}
+	}*/
+
+	// End new new spread logic
+
 	cerr << "Generated " << solutions.size() << " moves" << endl;
 }
 
@@ -409,6 +443,7 @@ int minmax(vector<vector<int>>& graph,
 	int beta) {
 	
 	if ((depth == 0) || turn.isWinningTurn()) {
+		cerr << "Returning minmax from depth " << depth << endl;
 		return turn.score(maximizingPlayer);
     }
     
